@@ -1,0 +1,32 @@
+[Unit]
+Description=Omostrich-DB background ingest (local Nostr analytics cache)
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/mise/shims/node %h/Projects/omostrich-db/bin/ingest.mjs
+Restart=on-failure
+RestartSec=5
+
+# Unlike omostrich.service, this process never holds a private key or
+# passphrase -- it only ever knows Tim's PUBLIC npub/pubkeyHex (learned
+# via a `omostrich-ctl status` call, itself public data) and writes
+# public Nostr events it received from relays into a local LMDB file.
+# There is no secret-in-memory-at-crash risk this needs to defend
+# against the way omostrich.service's LimitCORE=0 does -- but the rest
+# of the hardening below is still free, so it's included anyway:
+# same-user-process trust model, minimal footprint, no reason for this
+# one to be able to touch anything it doesn't need.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+# read-only, not fully blocked: this process needs to READ the
+# vendored `ndb` binary under ~/Projects/omostrich-db/bin/vendor/ and
+# call `omostrich-ctl` (a symlink under ~/.local/bin) -- both live
+# under %h. It does not need to WRITE anywhere under home except its
+# own data/state dirs, listed explicitly below.
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/omostrich-db %h/.local/state/omarchy/omostrich-db
+
+[Install]
+WantedBy=default.target

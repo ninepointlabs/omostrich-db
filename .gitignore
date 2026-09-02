@@ -1,0 +1,7 @@
+node_modules/
+vendor/nostrdb-src/
+vendor/nostrdb-src-tmp-*/
+bin/vendor/
+*.log
+*.mdb
+.DS_Store

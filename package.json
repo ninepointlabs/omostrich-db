@@ -1,0 +1,25 @@
+{
+  "name": "omostrich-db",
+  "version": "0.1.0",
+  "description": "Headless Nostr read/analytics service, sibling to Omostrich. Local nostrdb cache of your own notes/engagement, live relay queries for trends. Never touches the signing vault.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "bin": {
+    "omostrich-db-mcp": "./bin/mcp.mjs",
+    "omostrich-db-ingest": "./bin/ingest.mjs"
+  },
+  "scripts": {
+    "mcp": "node bin/mcp.mjs",
+    "ingest": "node bin/ingest.mjs",
+    "fetch-nostrdb": "bash scripts/fetch-nostrdb.sh",
+    "build-nostrdb": "bash scripts/build-nostrdb.sh"
+  },
+  "dependencies": {
+    "@nostr-dev-kit/ndk": "^3.0.3",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
