@@ -5,3 +5,5 @@ bin/vendor/
 *.log
 *.mdb
 .DS_Store
+# scratch HOME used by the child-process tests in test/
+test/.tmp-home/

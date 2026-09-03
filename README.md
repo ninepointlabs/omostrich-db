@@ -107,6 +107,44 @@ systemctl --user daemon-reload
 systemctl --user enable --now omostrich-db-ingest.service
 ```
 
+### How the ingest stays alive
+
+Each relay reconnects on its own after any close or error, with
+bounded exponential backoff plus jitter (1s base, 5 min cap), and
+re-sends its subscription with a `since` backdated by a 10-minute
+overlap so events that landed during the gap are refetched (nostrdb
+dedupes on import). One dead or flaky relay never stops the others and
+never ends the process. WebSocket ping/pong (30s / 10s) catches
+half-open sockets that would otherwise never fire `close`.
+
+Every 60s it logs a heartbeat: relays up/total, age of the last event
+and last import, total imported, pending batch, and per-relay
+up/down(attempt N). Every close, reconnect attempt, and reconnect is
+logged too, so "silently idle" cannot happen.
+
+If every relay has been unreachable continuously for 15 minutes the
+process flushes what it has and **exits 1 on purpose** so systemd
+starts a fresh one (fresh DNS, clean socket table). It never exits 0
+on its own; exit 0 is only ever `systemctl stop` / SIGTERM. The unit
+uses `Restart=always` as a second line of defence, not as a substitute
+for the reconnect logic.
+
+All timings are env-overridable (`OMOSTRICH_DB_*_MS`,
+`OMOSTRICH_DB_RELAYS`, `OMOSTRICH_DB_ALL_DOWN_EXIT_MS=0` to retry
+forever); see the top of `src/ingest.mjs`.
+
+```bash
+npm test   # reconnect / liveness / exit-code tests against a local fake relay
+```
+
+Why this exists: the first version had no reconnect logic. When the
+last relay closed its socket (~3h39m in), Node had no active handles,
+the event loop drained, the process exited 0, `Restart=on-failure`
+correctly did nothing, and the cache sat stale for 16 hours with
+nothing in the log. `test/ingest-reconnect.test.mjs` reproduces that
+exact sequence against the real `bin/ingest.mjs` and asserts it now
+exits 1 instead.
+
 ## Paths
 
 | What | Where |

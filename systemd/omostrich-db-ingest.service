@@ -1,18 +1,39 @@
 [Unit]
 Description=Omostrich-DB background ingest (local Nostr analytics cache)
 After=default.target
+# The process exits 1 on purpose after every relay has been unreachable
+# for OMOSTRICH_DB_ALL_DOWN_EXIT_MS (default 15 min) so a fresh process
+# gets fresh DNS/sockets. With RestartSec=5 that's one restart per ~15
+# min during a real outage; systemd's default StartLimitBurst=5 in 10s
+# would never trip on that, but be explicit so nobody "fixes" it later.
+StartLimitIntervalSec=300
+StartLimitBurst=10
 
 [Service]
 Type=simple
-ExecStart=%h/.local/share/mise/shims/node %h/Projects/omostrich-db/bin/ingest.mjs
-Restart=on-failure
+# Bare "node" resolved via PATH (Omarchy's Hyprland autostart imports the
+# full session environment into the systemd --user manager). Same
+# portability fix as omostrich.service: the old hardcoded mise shim path
+# silently doesn't exist for anyone on the system node package / nvm /
+# fnm / volta.
+ExecStart=node %h/Projects/omostrich-db/bin/ingest.mjs
+# Restart=always, NOT on-failure. Root cause of the 2026-09-02 outage:
+# the old ingest had no reconnect logic, so when the last relay socket
+# closed Node's event loop drained and the process exited 0 --
+# on-failure correctly did nothing and the cache sat stale for 16h.
+# The CODE fix is in src/ingest.mjs (per-relay reconnect with backoff,
+# heartbeat keeps the loop alive, all-down -> exit 1). `always` is
+# belt-and-braces on top of that, not a substitute for it: a clean
+# exit 0 is now only ever SIGTERM/SIGINT from `systemctl stop`, which
+# `always` still honours (systemd never restarts a unit it stopped).
+Restart=always
 RestartSec=5
 
 # Unlike omostrich.service, this process never holds a private key or
-# passphrase -- it only ever knows Tim's PUBLIC npub/pubkeyHex (learned
-# via a `omostrich-ctl status` call, itself public data) and writes
-# public Nostr events it received from relays into a local LMDB file.
-# There is no secret-in-memory-at-crash risk this needs to defend
+# passphrase -- it only ever knows the user's PUBLIC npub/pubkeyHex
+# (learned via a `omostrich-ctl status` call, itself public data) and
+# writes public Nostr events it received from relays into a local LMDB
+# file. There is no secret-in-memory-at-crash risk this needs to defend
 # against the way omostrich.service's LimitCORE=0 does -- but the rest
 # of the hardening below is still free, so it's included anyway:
 # same-user-process trust model, minimal footprint, no reason for this

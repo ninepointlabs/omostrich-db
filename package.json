@@ -12,6 +12,7 @@
   "scripts": {
     "mcp": "node bin/mcp.mjs",
     "ingest": "node bin/ingest.mjs",
+    "test": "node --test test/",
     "fetch-nostrdb": "bash scripts/fetch-nostrdb.sh",
     "build-nostrdb": "bash scripts/build-nostrdb.sh"
   },
